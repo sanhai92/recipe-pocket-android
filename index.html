@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f2ea">
+  <title>Recipe Pocket</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <div class="update-banner hidden" id="updateBanner">
+      <span>New version ready</span>
+      <button class="text-button primary" id="reloadUpdateButton">Update</button>
+    </div>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Recipe Pocket</p>
+        <h1 id="screenTitle">Recipes</h1>
+      </div>
+      <button class="icon-button primary" id="addRecipeButton" aria-label="Add recipe" title="Add recipe">+</button>
+    </header>
+
+    <main>
+      <section class="screen active" id="recipesScreen" aria-labelledby="screenTitle">
+        <div class="search-row">
+          <input id="recipeSearch" type="search" placeholder="Search recipes, tags, ingredients">
+          <button class="icon-button" id="favoritesFilter" aria-label="Show favorites" title="Favorites">☆</button>
+        </div>
+        <div class="chip-row" id="tagFilters"></div>
+        <div class="recipe-list" id="recipeList"></div>
+      </section>
+
+      <section class="screen" id="pantryScreen" aria-label="Pantry">
+        <div class="pantry-entry">
+          <input id="pantryInput" placeholder="Ingredient at home">
+          <button class="icon-button primary" id="addPantryButton" aria-label="Add ingredient">+</button>
+        </div>
+        <div class="chip-row" id="pantryChips"></div>
+        <h2>Can make</h2>
+        <div class="recipe-list compact" id="pantryMatches"></div>
+      </section>
+
+      <section class="screen" id="shoppingScreen" aria-label="Shopping list">
+        <div class="select-row">
+          <select id="shoppingRecipe"></select>
+          <button class="text-button" id="clearCheckedButton">Clear</button>
+        </div>
+        <div class="shopping-list" id="shoppingList"></div>
+      </section>
+
+      <section class="screen" id="settingsScreen" aria-label="Settings">
+        <div class="settings-grid">
+          <div class="settings-action app-version-card">
+            <span>Recipe Pocket <strong id="appVersionLabel"></strong></span>
+            <small id="appVersionNotes"></small>
+          </div>
+          <button class="settings-action" id="exportButton">
+            <span>Export backup</span>
+            <small>Save recipes as JSON</small>
+          </button>
+          <label class="settings-action file-action">
+            <span>Import backup</span>
+            <small>Load Recipe Pocket JSON</small>
+            <input id="importFile" type="file" accept="application/json">
+          </label>
+          <button class="settings-action danger" id="resetButton">
+            <span>Reset samples</span>
+            <small>Replace local data</small>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Main">
+      <button class="nav-item active" data-screen="recipesScreen" data-title="Recipes">Recipes</button>
+      <button class="nav-item" data-screen="pantryScreen" data-title="Pantry">Pantry</button>
+      <button class="nav-item" data-screen="shoppingScreen" data-title="Shopping">Shopping</button>
+      <button class="nav-item" data-screen="settingsScreen" data-title="Settings">Settings</button>
+    </nav>
+  </div>
+
+  <dialog id="recipeDialog">
+    <form method="dialog" class="editor" id="recipeForm">
+      <div class="dialog-head">
+        <h2 id="dialogTitle">Recipe</h2>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+
+      <input type="hidden" id="recipeId">
+      <label>Title<input id="titleInput" required></label>
+      <div class="split">
+        <label>Cuisine<input id="cuisineInput"></label>
+        <label>Minutes<input id="minutesInput" type="number" min="0" inputmode="numeric"></label>
+      </div>
+      <div class="split">
+        <label>Servings<input id="servingsInput" type="number" min="1" inputmode="numeric"></label>
+        <label>Tags<input id="tagsInput" placeholder="vegan, quick"></label>
+      </div>
+      <label>Ingredients<textarea id="ingredientsInput" rows="6" placeholder="1 cup rice&#10;2 tomato"></textarea></label>
+      <label>Tools<textarea id="toolsInput" rows="3" placeholder="Pan&#10;Knife"></textarea></label>
+      <label>Instructions<textarea id="instructionsInput" rows="7"></textarea></label>
+      <label>Source URL<input id="sourceInput" type="url" inputmode="url"></label>
+      <label>Photo<input id="imageInput" type="file" accept="image/*"></label>
+      <div class="toggle-line">
+        <label class="check-label"><input id="favoriteInput" type="checkbox"> Favorite</label>
+        <button type="button" class="text-button danger hidden" id="deleteRecipeButton">Delete</button>
+      </div>
+      <menu>
+        <button class="text-button" value="cancel">Cancel</button>
+        <button class="text-button primary" id="saveRecipeButton" value="default">Save</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog">
+    <article class="detail-view">
+      <div class="detail-hero" id="detailHero"></div>
+      <div class="detail-body">
+        <div class="dialog-head">
+          <div>
+            <p class="eyebrow" id="detailMeta"></p>
+            <h2 id="detailTitle"></h2>
+          </div>
+          <button class="icon-button" id="closeDetailButton" aria-label="Close">×</button>
+        </div>
+        <div class="serving-stepper">
+          <button class="icon-button" id="servingMinus" aria-label="Reduce servings">−</button>
+          <span id="servingLabel"></span>
+          <button class="icon-button" id="servingPlus" aria-label="Increase servings">+</button>
+        </div>
+        <h3>Ingredients</h3>
+        <ul id="detailIngredients"></ul>
+        <h3>Tools</h3>
+        <ul id="detailTools"></ul>
+        <h3>Instructions</h3>
+        <p id="detailInstructions"></p>
+        <a id="detailSource" target="_blank" rel="noreferrer">Open source</a>
+        <button class="text-button" id="editFromDetailButton">Edit</button>
+      </div>
+    </article>
+  </dialog>
+
+  <template id="recipeCardTemplate">
+    <button class="recipe-card">
+      <span class="photo"></span>
+      <span class="card-copy">
+        <strong></strong>
+        <small></small>
+        <span class="mini-tags"></span>
+      </span>
+      <span class="favorite-mark"></span>
+    </button>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

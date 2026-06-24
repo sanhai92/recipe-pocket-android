@@ -1,0 +1,17 @@
+{
+  "name": "Recipe Pocket",
+  "short_name": "Recipes",
+  "description": "A local recipe manager for Android phones.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fbf8f1",
+  "theme_color": "#2f6f5e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
