@@ -43,12 +43,8 @@
         <div class="recipe-list compact" id="pantryMatches"></div>
       </section>
 
-      <section class="screen" id="shoppingScreen" aria-label="Shopping list">
-        <div class="select-row">
-          <select id="shoppingRecipe"></select>
-          <button class="text-button" id="clearCheckedButton">Clear</button>
-        </div>
-        <div class="shopping-list" id="shoppingList"></div>
+      <section class="screen" id="mealPlannerScreen" aria-label="Mealplanner">
+        <div class="meal-plan-list" id="mealPlanList"></div>
       </section>
 
       <section class="screen" id="settingsScreen" aria-label="Settings">
@@ -66,6 +62,15 @@
             <small>Load Recipe Pocket JSON</small>
             <input id="importFile" type="file" accept="application/json">
           </label>
+          <button class="settings-action" id="importCodeButton">
+            <span>Import recipe code</span>
+            <small>Paste an RM1 code from Recipe Manager</small>
+          </button>
+          <label class="settings-action setting-field">
+            <span>Mealplanner servings</span>
+            <small>Default when planning a recipe</small>
+            <input id="defaultMealServingsInput" type="number" min="1" max="99" inputmode="numeric">
+          </label>
           <button class="settings-action danger" id="resetButton">
             <span>Reset samples</span>
             <small>Replace local data</small>
@@ -77,8 +82,8 @@
     <nav class="bottom-nav" aria-label="Main">
       <button class="nav-item active" data-screen="recipesScreen" data-title="Recipes">Recipes</button>
       <button class="nav-item" data-screen="pantryScreen" data-title="Pantry">Pantry</button>
-      <button class="nav-item" data-screen="shoppingScreen" data-title="Shopping">Shopping</button>
-      <button class="nav-item" data-screen="settingsScreen" data-title="Settings">Settings</button>
+      <button class="nav-item" data-screen="mealPlannerScreen" data-title="Mealplanner">Mealplanner</button>
+      <button class="nav-item icon-nav" data-screen="settingsScreen" data-title="Settings" aria-label="Settings" title="Settings">⚙</button>
     </nav>
   </div>
 
@@ -86,7 +91,7 @@
     <form method="dialog" class="editor" id="recipeForm">
       <div class="dialog-head">
         <h2 id="dialogTitle">Recipe</h2>
-        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+        <button type="button" class="icon-button" id="closeRecipeDialogButton" aria-label="Close">×</button>
       </div>
 
       <input type="hidden" id="recipeId">
@@ -103,21 +108,19 @@
       <label>Tools<textarea id="toolsInput" rows="3" placeholder="Pan&#10;Knife"></textarea></label>
       <label>Instructions<textarea id="instructionsInput" rows="7"></textarea></label>
       <label>Source URL<input id="sourceInput" type="url" inputmode="url"></label>
-      <label>Photo<input id="imageInput" type="file" accept="image/*"></label>
       <div class="toggle-line">
         <label class="check-label"><input id="favoriteInput" type="checkbox"> Favorite</label>
         <button type="button" class="text-button danger hidden" id="deleteRecipeButton">Delete</button>
       </div>
       <menu>
-        <button class="text-button" value="cancel">Cancel</button>
+        <button type="button" class="text-button" id="cancelRecipeButton">Cancel</button>
         <button class="text-button primary" id="saveRecipeButton" value="default">Save</button>
       </menu>
     </form>
   </dialog>
 
-  <dialog id="detailDialog">
+  <dialog id="detailDialog" class="detail-dialog">
     <article class="detail-view">
-      <div class="detail-hero" id="detailHero"></div>
       <div class="detail-body">
         <div class="dialog-head">
           <div>
@@ -138,14 +141,48 @@
         <h3>Instructions</h3>
         <p id="detailInstructions"></p>
         <a id="detailSource" target="_blank" rel="noreferrer">Open source</a>
-        <button class="text-button" id="editFromDetailButton">Edit</button>
+        <div class="detail-actions">
+          <button class="text-button" id="editFromDetailButton">Edit</button>
+          <button class="text-button" id="planRecipeButton">Plan</button>
+          <button class="text-button primary" id="shareRecipeButton">Share</button>
+        </div>
       </div>
     </article>
   </dialog>
 
+  <dialog id="planRecipeDialog">
+    <form method="dialog" class="editor" id="planRecipeForm">
+      <div class="dialog-head">
+        <h2>Add to Mealplanner</h2>
+        <button type="button" class="icon-button" id="closePlanRecipeButton" aria-label="Close">X</button>
+      </div>
+      <p class="form-message" id="planRecipeName"></p>
+      <label>Day<select id="planDaySelect"></select></label>
+      <label>Servings<input id="planServingsInput" type="number" min="1" inputmode="numeric"></label>
+      <menu>
+        <button type="button" class="text-button" id="cancelPlanRecipeButton">Cancel</button>
+        <button class="text-button primary" id="savePlanRecipeButton" value="default">Add</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="importCodeDialog">
+    <form method="dialog" class="editor" id="importCodeForm">
+      <div class="dialog-head">
+        <h2>Import recipe code</h2>
+        <button type="button" class="icon-button" id="closeImportCodeButton" aria-label="Close">X</button>
+      </div>
+      <label>RM1 code<textarea id="recipeCodeInput" rows="9" placeholder="RM1-BEGIN:...:RM1-END"></textarea></label>
+      <p class="form-message" id="recipeCodeMessage"></p>
+      <menu>
+        <button type="button" class="text-button" id="cancelImportCodeButton">Cancel</button>
+        <button class="text-button primary" id="importCodeSubmitButton" value="default">Import</button>
+      </menu>
+    </form>
+  </dialog>
+
   <template id="recipeCardTemplate">
     <button class="recipe-card">
-      <span class="photo"></span>
       <span class="card-copy">
         <strong></strong>
         <small></small>
@@ -153,6 +190,22 @@
       </span>
       <span class="favorite-mark"></span>
     </button>
+  </template>
+
+  <template id="mealPlanDayTemplate">
+    <article class="meal-day">
+      <div class="meal-day-head">
+        <button class="meal-toggle-button" type="button">
+          <span class="meal-day-name"></span>
+          <span class="meal-day-summary"></span>
+        </button>
+        <button class="text-button meal-clear-button" type="button">Clear</button>
+      </div>
+      <div class="meal-day-body">
+        <label>Recipe<select class="meal-recipe-select"></select></label>
+        <label class="servings-label">Servings<input class="meal-servings-input" type="number" min="1" inputmode="numeric"></label>
+      </div>
+    </article>
   </template>
 
   <script src="app.js"></script>
