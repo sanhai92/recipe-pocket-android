@@ -211,11 +211,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 
 .nav-item.active { color: white; background: var(--blue); }
 
-.icon-nav {
-  font-size: 1.35rem;
-  line-height: 1;
-}
-
 dialog {
   width: min(100vw, 560px);
   max-height: 92svh;

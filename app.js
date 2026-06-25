@@ -1,6 +1,6 @@
 const STORAGE_KEY = "recipe-pocket-data-v1";
-const APP_VERSION = "1.0.2";
-const APP_VERSION_NOTES = "Improves app update handling so new releases activate more smoothly";
+const APP_VERSION = "1.0.3";
+const APP_VERSION_NOTES = "Fixes icon rendering on devices with limited symbol support";
 const RM1_BEGIN = "RM1-BEGIN:";
 const RM1_END = ":RM1-END";
 const RM1_LEGACY_PREFIX = "RM1:";
@@ -145,7 +145,7 @@ function formatMeta(recipe) {
   if (recipe.cuisine) parts.push(recipe.cuisine);
   if (recipe.minutes) parts.push(`${recipe.minutes} min`);
   parts.push(`${recipe.servings || 1} servings`);
-  return parts.join(" ? ");
+  return parts.join(" - ");
 }
 
 function parseIngredients(text) {
@@ -242,7 +242,7 @@ function createRecipeCard(recipe) {
   node.querySelector("strong").textContent = recipe.title;
   node.querySelector("small").textContent = formatMeta(recipe);
   node.querySelector(".mini-tags").textContent = (recipe.tags || []).map((tag) => `#${tag}`).join(" ");
-  node.querySelector(".favorite-mark").textContent = recipe.favorite ? "?" : "";
+  node.querySelector(".favorite-mark").textContent = recipe.favorite ? "*" : "";
   node.addEventListener("click", () => openDetail(recipe.id));
   return node;
 }
@@ -253,7 +253,7 @@ function renderPantry() {
   state.pantry.forEach((item) => {
     const button = document.createElement("button");
     button.className = "chip active";
-    button.textContent = `${item} ?`;
+    button.textContent = `${item} x`;
     button.addEventListener("click", () => {
       state.pantry = state.pantry.filter((x) => x !== item);
       saveState();
