@@ -11,8 +11,8 @@
 <body>
   <div class="app-shell">
     <div class="update-banner hidden" id="updateBanner">
-      <span>New version ready</span>
-      <button class="text-button primary" id="reloadUpdateButton">Update</button>
+      <span>Update available</span>
+      <button class="text-button primary" id="reloadUpdateButton">Restart</button>
     </div>
 
     <header class="topbar">
@@ -27,7 +27,7 @@
       <section class="screen active" id="recipesScreen" aria-labelledby="screenTitle">
         <div class="search-row">
           <input id="recipeSearch" type="search" placeholder="Search recipes, tags, ingredients">
-          <button class="icon-button" id="favoritesFilter" aria-label="Show favorites" title="Favorites">☆</button>
+          <button class="icon-button" id="favoritesFilter" aria-label="Show favorites" title="Favorites">?</button>
         </div>
         <div class="chip-row" id="tagFilters"></div>
         <div class="recipe-list" id="recipeList"></div>
@@ -83,7 +83,7 @@
       <button class="nav-item active" data-screen="recipesScreen" data-title="Recipes">Recipes</button>
       <button class="nav-item" data-screen="pantryScreen" data-title="Pantry">Pantry</button>
       <button class="nav-item" data-screen="mealPlannerScreen" data-title="Mealplanner">Mealplanner</button>
-      <button class="nav-item icon-nav" data-screen="settingsScreen" data-title="Settings" aria-label="Settings" title="Settings">⚙</button>
+      <button class="nav-item icon-nav" data-screen="settingsScreen" data-title="Settings" aria-label="Settings" title="Settings">?</button>
     </nav>
   </div>
 
@@ -91,7 +91,7 @@
     <form method="dialog" class="editor" id="recipeForm">
       <div class="dialog-head">
         <h2 id="dialogTitle">Recipe</h2>
-        <button type="button" class="icon-button" id="closeRecipeDialogButton" aria-label="Close">×</button>
+        <button type="button" class="icon-button" id="closeRecipeDialogButton" aria-label="Close">?</button>
       </div>
 
       <input type="hidden" id="recipeId">
@@ -127,10 +127,10 @@
             <p class="eyebrow" id="detailMeta"></p>
             <h2 id="detailTitle"></h2>
           </div>
-          <button class="icon-button" id="closeDetailButton" aria-label="Close">×</button>
+          <button class="icon-button" id="closeDetailButton" aria-label="Close">?</button>
         </div>
         <div class="serving-stepper">
-          <button class="icon-button" id="servingMinus" aria-label="Reduce servings">−</button>
+          <button class="icon-button" id="servingMinus" aria-label="Reduce servings">?</button>
           <span id="servingLabel"></span>
           <button class="icon-button" id="servingPlus" aria-label="Increase servings">+</button>
         </div>
