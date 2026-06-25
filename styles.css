@@ -296,6 +296,11 @@ menu {
   color: #9d312b;
 }
 
+.form-message.warning {
+  color: #9d6b16;
+  font-weight: 750;
+}
+
 .serving-stepper {
   display: inline-flex;
   align-items: center;
@@ -335,6 +340,7 @@ li { margin: 8px 0; }
   grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
+  cursor: pointer;
 }
 
 .meal-toggle-button {
@@ -342,10 +348,12 @@ li { margin: 8px 0; }
   background: transparent;
   color: var(--ink);
   display: grid;
-  gap: 2px;
+  gap: 4px;
+  grid-template-columns: auto minmax(0, 1fr);
   min-width: 0;
   padding: 6px;
   text-align: left;
+  width: 100%;
 }
 
 .meal-day-name {
@@ -359,6 +367,14 @@ li { margin: 8px 0; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.meal-day-body[hidden] {
+  display: none;
+}
+
+.meal-day:not(.expanded) .meal-day-body {
+  display: none;
 }
 
 .meal-day-body {
@@ -390,6 +406,10 @@ li { margin: 8px 0; }
   height: 40px;
   min-width: 58px;
   padding: 0 12px;
+}
+
+.meal-day:not(.expanded) .meal-clear-button {
+  display: none;
 }
 
 .settings-grid { display: grid; gap: 12px; }

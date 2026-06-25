@@ -1,6 +1,6 @@
 const STORAGE_KEY = "recipe-pocket-data-v1";
-const APP_VERSION = "1.0.3";
-const APP_VERSION_NOTES = "Fixes icon rendering on devices with limited symbol support";
+const APP_VERSION = "1.0.5";
+const APP_VERSION_NOTES = "Shows existing Mealplanner entries before replacing a day";
 const RM1_BEGIN = "RM1-BEGIN:";
 const RM1_END = ":RM1-END";
 const RM1_LEGACY_PREFIX = "RM1:";
@@ -283,12 +283,13 @@ function renderMealPlan() {
     const isExpanded = expandedMealDay === day;
     node.classList.toggle("expanded", isExpanded);
     node.querySelector(".meal-day-name").textContent = day;
-    node.querySelector(".meal-day-summary").textContent = recipe
-      ? `${recipe.title} for ${entry.servings} ${entry.servings === 1 ? "serving" : "servings"}`
-      : "No meal planned";
-    node.querySelector(".meal-day-body").hidden = !isExpanded;
+    node.querySelector(".meal-day-summary").textContent = recipe ? recipe.title : "No meal planned";
+    const mealBody = node.querySelector(".meal-day-body");
+    mealBody.hidden = !isExpanded;
+    node.querySelector(".meal-toggle-button").setAttribute("aria-expanded", String(isExpanded));
 
-    node.querySelector(".meal-toggle-button").addEventListener("click", (event) => {
+    node.querySelector(".meal-day-head").addEventListener("click", (event) => {
+      if (event.target.closest(".meal-clear-button")) return;
       const selectedDay = event.currentTarget.closest(".meal-day").dataset.day;
       expandedMealDay = expandedMealDay === selectedDay ? "" : selectedDay;
       renderMealPlan();
@@ -501,6 +502,7 @@ function wireEvents() {
   $("shareRecipeButton").addEventListener("click", shareCurrentRecipe);
   $("planRecipeButton").addEventListener("click", openPlanRecipeDialog);
   $("planRecipeForm").addEventListener("submit", savePlannedRecipe);
+  $("planDaySelect").addEventListener("change", updatePlanDayPreview);
   $("closePlanRecipeButton").addEventListener("click", () => $("planRecipeDialog").close());
   $("cancelPlanRecipeButton").addEventListener("click", () => $("planRecipeDialog").close());
   $("servingMinus").addEventListener("click", () => {
@@ -560,13 +562,27 @@ function openPlanRecipeDialog() {
   $("planRecipeName").textContent = recipe.title;
   $("planDaySelect").innerHTML = "";
   DAYS_OF_WEEK.forEach((day) => {
+    const entry = state.mealPlan[day];
+    const plannedRecipe = state.recipes.find((item) => item.id === entry?.recipeId);
     const option = document.createElement("option");
     option.value = day;
-    option.textContent = day;
+    option.textContent = plannedRecipe ? `${day} - ${plannedRecipe.title}` : day;
     $("planDaySelect").append(option);
   });
   $("planServingsInput").value = state.settings.defaultMealServings;
+  updatePlanDayPreview();
   $("planRecipeDialog").showModal();
+}
+
+function updatePlanDayPreview() {
+  const day = $("planDaySelect").value;
+  const entry = state.mealPlan[day];
+  const plannedRecipe = state.recipes.find((item) => item.id === entry?.recipeId);
+  const message = plannedRecipe
+    ? `Currently: ${plannedRecipe.title} for ${entry.servings} ${entry.servings === 1 ? "serving" : "servings"}`
+    : "No recipe planned for this day.";
+  $("planDayPreview").textContent = message;
+  $("planDayPreview").classList.toggle("warning", Boolean(plannedRecipe));
 }
 
 function savePlannedRecipe(event) {
