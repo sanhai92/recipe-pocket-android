@@ -18,6 +18,7 @@
       <span>Backup reminder</span>
       <button class="text-button primary" id="backupNowButton">Backup</button>
     </div>
+    <div class="toast hidden" id="toastMessage" role="status" aria-live="polite"></div>
 
     <header class="topbar">
       <div>
@@ -49,6 +50,20 @@
 
       <section class="screen" id="mealPlannerScreen" aria-label="Mealplanner">
         <div class="meal-plan-list" id="mealPlanList"></div>
+        <section class="shopping-panel" aria-label="Shopping list">
+          <div class="section-head">
+            <h2>Shopping list</h2>
+            <div class="shopping-actions">
+              <select id="shoppingSortSelect" aria-label="Sort shopping list">
+                <option value="recipe">By recipe</option>
+                <option value="category">By category</option>
+              </select>
+              <button class="text-button" id="copyShoppingButton" type="button">Copy</button>
+              <button class="text-button" id="clearShoppingButton" type="button">Clear</button>
+            </div>
+          </div>
+          <div class="shopping-list" id="mealShoppingList"></div>
+        </section>
       </section>
 
       <section class="screen" id="settingsScreen" aria-label="Settings">
@@ -79,6 +94,14 @@
             <span>Mealplanner servings</span>
             <small>Default when planning a recipe</small>
             <input id="defaultMealServingsInput" type="number" min="1" max="99" inputmode="numeric">
+          </label>
+          <label class="settings-action setting-field">
+            <span>Shopping list sort</span>
+            <small>Default Mealplanner shopping order</small>
+            <select id="defaultShoppingSortSelect">
+              <option value="recipe">By recipe</option>
+              <option value="category">By category</option>
+            </select>
           </label>
           <button class="settings-action danger" id="resetButton">
             <span>Reset samples</span>

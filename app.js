@@ -1,6 +1,6 @@
 const STORAGE_KEY = "recipe-pocket-data-v1";
-const APP_VERSION = "1.0.7";
-const APP_VERSION_NOTES = "Makes backup filenames easier to recognize";
+const APP_VERSION = "1.0.11";
+const APP_VERSION_NOTES = "Adds shopping copy and default sort settings";
 const RM1_BEGIN = "RM1-BEGIN:";
 const RM1_END = ":RM1-END";
 const RM1_LEGACY_PREFIX = "RM1:";
@@ -102,14 +102,15 @@ function loadState() {
 }
 
 function createDefaultSettings() {
-  return { defaultMealServings: 2, backupReminderDays: 7, lastBackupAt: "" };
+  return { defaultMealServings: 2, backupReminderDays: 7, lastBackupAt: "", shoppingSort: "recipe" };
 }
 
 function normalizeSettings(settings) {
   return {
     defaultMealServings: clampServings(settings?.defaultMealServings ?? 2),
     backupReminderDays: clampBackupDays(settings?.backupReminderDays ?? 7),
-    lastBackupAt: typeof settings?.lastBackupAt === "string" ? settings.lastBackupAt : ""
+    lastBackupAt: typeof settings?.lastBackupAt === "string" ? settings.lastBackupAt : "",
+    shoppingSort: settings?.shoppingSort === "category" ? "category" : "recipe"
   };
 }
 
@@ -198,6 +199,7 @@ function renderVersion() {
 function renderSettings() {
   $("defaultMealServingsInput").value = state.settings.defaultMealServings;
   $("backupReminderDaysInput").value = state.settings.backupReminderDays;
+  $("defaultShoppingSortSelect").value = state.settings.shoppingSort;
   $("backupStatusText").textContent = state.settings.lastBackupAt
     ? `Last backup: ${new Date(state.settings.lastBackupAt).toLocaleDateString()}`
     : "No backup saved yet";
@@ -346,6 +348,175 @@ function renderMealPlan() {
     });
     list.append(node);
   });
+  renderMealShoppingList();
+}
+
+function renderMealShoppingList() {
+  const list = $("mealShoppingList");
+  $("shoppingSortSelect").value = state.settings.shoppingSort;
+  list.innerHTML = "";
+  const sections = getMealShoppingSections();
+  sections.forEach((section) => {
+    if (section.title) {
+      const heading = document.createElement("h3");
+      heading.className = "shopping-recipe-heading";
+      heading.textContent = section.title;
+      list.append(heading);
+    }
+    section.items.forEach((item) => list.append(createShoppingItem(item)));
+  });
+  if (!sections.some((section) => section.items.length)) list.innerHTML = `<p class="empty">No planned ingredients to shop for.</p>`;
+}
+
+function getUncheckedShoppingText() {
+  const sections = getMealShoppingSections()
+    .map((section) => ({
+      title: section.title,
+      items: section.items.filter((item) => !state.checkedShopping.includes(item.key))
+    }))
+    .filter((section) => section.items.length);
+  return sections.flatMap((section) => [
+    ...(section.title ? [section.title] : []),
+    ...section.items.map((item) => `- ${item.text}`)
+  ]).join("\n");
+}
+
+async function copyUncheckedShoppingList() {
+  const text = getUncheckedShoppingText();
+  if (!text) {
+    showToast("Nothing to copy");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("Shopping list copied");
+  } catch {
+    showToast("Copy failed");
+  }
+}
+
+function showToast(message) {
+  $("toastMessage").textContent = message;
+  $("toastMessage").classList.remove("hidden");
+  window.clearTimeout(showToast.timeoutId);
+  showToast.timeoutId = window.setTimeout(() => $("toastMessage").classList.add("hidden"), 2200);
+}
+
+function createShoppingItem(item) {
+  const label = document.createElement("label");
+  label.className = `shopping-item ${state.checkedShopping.includes(item.key) ? "done" : ""}`;
+  label.innerHTML = `<input type="checkbox"><span></span>`;
+  const checkbox = label.querySelector("input");
+  checkbox.checked = state.checkedShopping.includes(item.key);
+  label.querySelector("span").textContent = item.text;
+  checkbox.addEventListener("change", () => {
+    state.checkedShopping = checkbox.checked
+      ? [...new Set([...state.checkedShopping, item.key])]
+      : state.checkedShopping.filter((checked) => checked !== item.key);
+    saveState();
+    renderMealShoppingList();
+  });
+  return label;
+}
+
+function getMealShoppingSections() {
+  return state.settings.shoppingSort === "category"
+    ? getCategorySortedShoppingSections()
+    : getRecipeSortedShoppingSections();
+}
+
+function getRecipeSortedShoppingSections() {
+  const pantrySet = new Set(state.pantry.map(normalize));
+  return DAYS_OF_WEEK.map((day) => {
+    const entry = state.mealPlan[day];
+    const recipe = state.recipes.find((item) => item.id === entry?.recipeId);
+    if (!recipe) return null;
+    const grouped = new Map();
+    const multiplier = clampServings(entry.servings) / (recipe.servings || 1);
+    recipe.ingredients.forEach((ingredient) => {
+      if (pantrySet.has(normalize(ingredient.name))) return;
+      const key = `${normalize(ingredient.unit)}::${normalize(ingredient.name)}`;
+      const current = grouped.get(key) || { ...ingredient, quantity: 0, hasQuantity: true };
+      if (ingredient.quantity) {
+        current.quantity += ingredient.quantity * multiplier;
+      } else {
+        current.hasQuantity = false;
+      }
+      grouped.set(key, current);
+    });
+    const items = [...grouped.values()]
+      .map((item) => createShoppingItemData(item, `${recipe.id}:${day}`))
+      .sort((a, b) => a.text.localeCompare(b.text));
+    return { title: recipe.title, items };
+  }).filter(Boolean).filter((section) => section.items.length);
+}
+
+function getCategorySortedShoppingSections() {
+  const pantrySet = new Set(state.pantry.map(normalize));
+  const grouped = new Map();
+  DAYS_OF_WEEK.forEach((day) => {
+    const entry = state.mealPlan[day];
+    const recipe = state.recipes.find((item) => item.id === entry?.recipeId);
+    if (!recipe) return;
+    const multiplier = clampServings(entry.servings) / (recipe.servings || 1);
+    recipe.ingredients.forEach((ingredient) => {
+      if (pantrySet.has(normalize(ingredient.name))) return;
+      const key = `${normalize(ingredient.unit)}::${normalize(ingredient.name)}`;
+      const current = grouped.get(key) || { ...ingredient, quantity: 0, hasQuantity: true };
+      if (ingredient.quantity) {
+        current.quantity += ingredient.quantity * multiplier;
+      } else {
+        current.hasQuantity = false;
+      }
+      grouped.set(key, current);
+    });
+  });
+  const items = [...grouped.values()]
+    .map((item) => createShoppingItemData(item, "category"))
+    .sort((a, b) => a.category.localeCompare(b.category) || a.text.localeCompare(b.text));
+  const sections = new Map();
+  items.forEach((item) => {
+    const title = formatShoppingCategory(item.category);
+    const section = sections.get(title) || { title, items: [] };
+    section.items.push(item);
+    sections.set(title, section);
+  });
+  return [...sections.values()];
+}
+
+function createShoppingItemData(item, scope) {
+  const text = item.hasQuantity ? formatIngredient(item) : [item.unit, item.name].filter(Boolean).join(" ");
+  return {
+    category: getIngredientCategory(item.name),
+    key: `${scope}:${normalize(item.unit)}:${normalize(item.name)}`,
+    text
+  };
+}
+
+function getIngredientCategory(name) {
+  const value = normalize(name);
+  if (/(beef|chicken|pork|bacon|ham|turkey|sausage|fish|salmon|tuna|shrimp|meat)/.test(value)) return "01-meat";
+  if (/(milk|cheese|yogurt|cream|butter|egg)/.test(value)) return "02-dairy";
+  if (/(potato|carrot|onion|garlic|leek|tomato|cucumber|pepper|lettuce|spinach|broccoli|vegetable|mushroom)/.test(value)) return "03-vegetable";
+  if (/(apple|banana|orange|lemon|lime|berry|fruit)/.test(value)) return "04-fruit";
+  if (/(pasta|rice|flour|bread|noodle|oat|grain)/.test(value)) return "05-grain";
+  if (/(lentil|bean|chickpea|pea)/.test(value)) return "06-legume";
+  if (/(salt|pepper|spice|mustard|sauce|oil|vinegar|tahini)/.test(value)) return "07-pantry";
+  return "99-other";
+}
+
+function formatShoppingCategory(category) {
+  const labels = {
+    "01-meat": "Meat and fish",
+    "02-dairy": "Dairy and eggs",
+    "03-vegetable": "Vegetables",
+    "04-fruit": "Fruit",
+    "05-grain": "Grains and bread",
+    "06-legume": "Beans and legumes",
+    "07-pantry": "Pantry",
+    "99-other": "Other"
+  };
+  return labels[category] || "Other";
 }
 
 function addRecipeOptions(select, selectedRecipeId = "") {
@@ -530,6 +701,19 @@ function wireEvents() {
   $("planDaySelect").addEventListener("change", updatePlanDayPreview);
   $("closePlanRecipeButton").addEventListener("click", () => $("planRecipeDialog").close());
   $("cancelPlanRecipeButton").addEventListener("click", () => $("planRecipeDialog").close());
+  $("shoppingSortSelect").addEventListener("change", () => {
+    state.settings.shoppingSort = $("shoppingSortSelect").value === "category" ? "category" : "recipe";
+    state.checkedShopping = [];
+    saveState();
+    renderSettings();
+    renderMealShoppingList();
+  });
+  $("copyShoppingButton").addEventListener("click", copyUncheckedShoppingList);
+  $("clearShoppingButton").addEventListener("click", () => {
+    state.checkedShopping = [];
+    saveState();
+    renderMealShoppingList();
+  });
   $("servingMinus").addEventListener("click", () => {
     detailServings = Math.max(1, detailServings - 1);
     renderDetail();
@@ -549,6 +733,7 @@ function wireEvents() {
   $("defaultMealServingsInput").addEventListener("change", saveDefaultMealServings);
   $("backupReminderDaysInput").addEventListener("input", saveBackupReminderDays);
   $("backupReminderDaysInput").addEventListener("change", saveBackupReminderDays);
+  $("defaultShoppingSortSelect").addEventListener("change", saveDefaultShoppingSort);
   $("resetButton").addEventListener("click", resetSamples);
   $("reloadUpdateButton").addEventListener("click", () => {
     if (navigator.serviceWorker?.controller) {
@@ -569,6 +754,14 @@ function saveBackupReminderDays() {
   saveState();
   renderSettings();
   renderBackupReminder();
+}
+
+function saveDefaultShoppingSort() {
+  state.settings.shoppingSort = $("defaultShoppingSortSelect").value === "category" ? "category" : "recipe";
+  state.checkedShopping = [];
+  saveState();
+  renderSettings();
+  renderMealShoppingList();
 }
 
 async function shareCurrentRecipe() {
