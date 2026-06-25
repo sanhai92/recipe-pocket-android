@@ -79,7 +79,7 @@ h3 { font-size: 1rem; margin: 20px 0 8px; }
 .screen { display: none; }
 .screen.active { display: block; }
 
-.search-row, .pantry-entry, .select-row, .split, .toggle-line {
+.search-row, .pantry-entry, .select-row, .split, .toggle-line, .detail-actions {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -153,21 +153,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
   background: rgba(255, 253, 248, .88);
   color: var(--ink);
   display: grid;
-  grid-template-columns: 76px 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: 12px;
-  padding: 10px;
+  padding: 16px;
   text-align: left;
   box-shadow: 0 8px 20px rgba(45, 36, 22, .08);
-  min-height: 98px;
-}
-
-.recipe-card .photo {
-  width: 76px;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--green), var(--gold));
-  background-size: cover;
-  background-position: center;
+  min-height: 86px;
 }
 
 .card-copy {
@@ -191,8 +182,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 .mini-tags { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .favorite-mark { color: var(--gold); font-size: 1.2rem; align-self: start; }
 
-.compact .recipe-card { grid-template-columns: 52px 1fr auto; min-height: 72px; }
-.compact .photo { width: 52px; }
+.compact .recipe-card { min-height: 72px; }
 
 .bottom-nav {
   position: fixed;
@@ -221,6 +211,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--green); box-shad
 
 .nav-item.active { color: white; background: var(--blue); }
 
+.icon-nav {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
 dialog {
   width: min(100vw, 560px);
   max-height: 92svh;
@@ -231,6 +226,19 @@ dialog {
   background: var(--paper);
   color: var(--ink);
   box-shadow: var(--shadow);
+}
+
+.detail-dialog {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+  height: calc(100svh - 28px);
+  max-height: calc(100svh - 28px);
+  margin: 0;
+  border-radius: 8px;
 }
 
 dialog::backdrop { background: rgba(23, 22, 19, .45); backdrop-filter: blur(4px); }
@@ -276,13 +284,21 @@ menu {
 
 .check-label input { width: auto; }
 
-.detail-view { max-height: 92svh; overflow: auto; }
+.detail-view { max-height: calc(100svh - 28px); overflow: auto; }
 
-.detail-hero {
-  height: 210px;
-  background: linear-gradient(135deg, var(--tomato), var(--gold), var(--green));
-  background-size: cover;
-  background-position: center;
+.detail-actions {
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.form-message {
+  color: var(--muted);
+  font-size: .9rem;
+  margin: 0;
+}
+
+.form-message.error {
+  color: #9d312b;
 }
 
 .serving-stepper {
@@ -304,24 +320,82 @@ menu {
 ul { padding-left: 22px; }
 li { margin: 8px 0; }
 
-.shopping-list {
+.meal-plan-list {
   display: grid;
-  gap: 8px;
-  padding-top: 14px;
+  gap: 12px;
 }
 
-.shopping-item {
-  display: flex;
-  gap: 10px;
-  align-items: center;
+.meal-day {
   border: 1px solid var(--line);
-  background: var(--white);
   border-radius: 8px;
-  padding: 12px;
+  background: rgba(255, 253, 248, .9);
+  box-shadow: 0 8px 20px rgba(45, 36, 22, .08);
+  display: grid;
+  gap: 10px;
+  padding: 10px;
 }
 
-.shopping-item input { width: auto; }
-.shopping-item.done span { text-decoration: line-through; color: var(--muted); }
+.meal-day-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.meal-toggle-button {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px;
+  text-align: left;
+}
+
+.meal-day-name {
+  font-size: 1.02rem;
+  font-weight: 850;
+}
+
+.meal-day-summary {
+  color: var(--muted);
+  font-size: .88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meal-day-body {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding: 10px 6px 4px;
+}
+
+.meal-day label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.servings-label {
+  max-width: 112px;
+}
+
+.meal-servings-input {
+  max-width: 84px;
+  padding-inline: 10px;
+  text-align: center;
+}
+
+.meal-clear-button {
+  height: 40px;
+  min-width: 58px;
+  padding: 0 12px;
+}
 
 .settings-grid { display: grid; gap: 12px; }
 
@@ -339,6 +413,11 @@ li { margin: 8px 0; }
 .settings-action span { font-weight: 850; }
 .settings-action small { color: var(--muted); }
 .file-action input { display: none; }
+.setting-field input {
+  margin-top: 8px;
+  max-width: 96px;
+  text-align: center;
+}
 .app-version-card {
   background: #edf6f1;
   border-color: rgba(47, 111, 94, .26);
