@@ -30,7 +30,7 @@ button { touch-action: manipulation; }
   padding: env(safe-area-inset-top) 16px calc(82px + env(safe-area-inset-bottom));
 }
 
-.update-banner {
+.update-banner, .backup-banner {
   position: sticky;
   top: 8px;
   z-index: 8;
@@ -46,7 +46,13 @@ button { touch-action: manipulation; }
   box-shadow: 0 8px 20px rgba(45, 36, 22, .1);
 }
 
-.update-banner span {
+.backup-banner {
+  border-color: var(--gold);
+  background: #fff7df;
+  color: #7a5512;
+}
+
+.update-banner span, .backup-banner span {
   font-weight: 850;
 }
 

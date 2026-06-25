@@ -1,4 +1,4 @@
-const CACHE_NAME = "recipe-pocket-v1.0.5";
+const CACHE_NAME = "recipe-pocket-v1.0.7";
 const ASSETS = [
   "./",
   "./index.html",

@@ -1,12 +1,13 @@
 const STORAGE_KEY = "recipe-pocket-data-v1";
-const APP_VERSION = "1.0.5";
-const APP_VERSION_NOTES = "Shows existing Mealplanner entries before replacing a day";
+const APP_VERSION = "1.0.7";
+const APP_VERSION_NOTES = "Makes backup filenames easier to recognize";
 const RM1_BEGIN = "RM1-BEGIN:";
 const RM1_END = ":RM1-END";
 const RM1_LEGACY_PREFIX = "RM1:";
 const MAX_RM1_CODE_LENGTH = 100000;
 const MAX_RM1_DECODED_BYTES = 1000000;
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const sampleRecipes = [
   {
@@ -101,17 +102,23 @@ function loadState() {
 }
 
 function createDefaultSettings() {
-  return { defaultMealServings: 2 };
+  return { defaultMealServings: 2, backupReminderDays: 7, lastBackupAt: "" };
 }
 
 function normalizeSettings(settings) {
   return {
-    defaultMealServings: clampServings(settings?.defaultMealServings ?? 2)
+    defaultMealServings: clampServings(settings?.defaultMealServings ?? 2),
+    backupReminderDays: clampBackupDays(settings?.backupReminderDays ?? 7),
+    lastBackupAt: typeof settings?.lastBackupAt === "string" ? settings.lastBackupAt : ""
   };
 }
 
 function clampServings(value) {
   return Math.min(99, Math.max(1, Number(value) || 1));
+}
+
+function clampBackupDays(value) {
+  return Math.min(365, Math.max(1, Number(value) || 7));
 }
 
 function createEmptyMealPlan() {
@@ -176,6 +183,7 @@ function formatIngredient(item, multiplier = 1) {
 function renderAll() {
   renderVersion();
   renderSettings();
+  renderBackupReminder();
   renderTags();
   renderRecipes();
   renderPantry();
@@ -189,6 +197,23 @@ function renderVersion() {
 
 function renderSettings() {
   $("defaultMealServingsInput").value = state.settings.defaultMealServings;
+  $("backupReminderDaysInput").value = state.settings.backupReminderDays;
+  $("backupStatusText").textContent = state.settings.lastBackupAt
+    ? `Last backup: ${new Date(state.settings.lastBackupAt).toLocaleDateString()}`
+    : "No backup saved yet";
+}
+
+function renderBackupReminder() {
+  const shouldShow = isBackupDue();
+  $("backupBanner").classList.toggle("hidden", !shouldShow);
+}
+
+function isBackupDue() {
+  if (!state.recipes.length) return false;
+  if (!state.settings.lastBackupAt) return true;
+  const lastBackup = Date.parse(state.settings.lastBackupAt);
+  if (!Number.isFinite(lastBackup)) return true;
+  return Date.now() - lastBackup >= state.settings.backupReminderDays * DAY_MS;
 }
 
 function renderTags() {
@@ -514,6 +539,7 @@ function wireEvents() {
     renderDetail();
   });
   $("exportButton").addEventListener("click", exportData);
+  $("backupNowButton").addEventListener("click", exportData);
   $("importFile").addEventListener("change", importData);
   $("importCodeButton").addEventListener("click", openImportCodeDialog);
   $("importCodeForm").addEventListener("submit", importRecipeCode);
@@ -521,6 +547,8 @@ function wireEvents() {
   $("cancelImportCodeButton").addEventListener("click", () => $("importCodeDialog").close());
   $("defaultMealServingsInput").addEventListener("input", saveDefaultMealServings);
   $("defaultMealServingsInput").addEventListener("change", saveDefaultMealServings);
+  $("backupReminderDaysInput").addEventListener("input", saveBackupReminderDays);
+  $("backupReminderDaysInput").addEventListener("change", saveBackupReminderDays);
   $("resetButton").addEventListener("click", resetSamples);
   $("reloadUpdateButton").addEventListener("click", () => {
     if (navigator.serviceWorker?.controller) {
@@ -534,6 +562,13 @@ function saveDefaultMealServings() {
     state.settings.defaultMealServings = clampServings($("defaultMealServingsInput").value);
     saveState();
     renderSettings();
+}
+
+function saveBackupReminderDays() {
+  state.settings.backupReminderDays = clampBackupDays($("backupReminderDaysInput").value);
+  saveState();
+  renderSettings();
+  renderBackupReminder();
 }
 
 async function shareCurrentRecipe() {
@@ -825,10 +860,16 @@ function exportData() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const recipeCount = state.recipes.length;
   link.href = url;
-  link.download = `recipe-pocket-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `Recipe-Pocket-backup-${timestamp}-v${APP_VERSION}-${recipeCount}-recipes.json`;
   link.click();
   URL.revokeObjectURL(url);
+  state.settings.lastBackupAt = new Date().toISOString();
+  saveState();
+  renderSettings();
+  renderBackupReminder();
 }
 
 function importData(event) {
