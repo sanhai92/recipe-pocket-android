@@ -82,12 +82,12 @@
             <input id="backupReminderDaysInput" type="number" min="1" max="365" inputmode="numeric">
           </label>
           <label class="settings-action file-action">
-            <span>Import backup</span>
-            <small>Load Recipe Pocket JSON</small>
-            <input id="importFile" type="file" accept="application/json">
+            <span>Import recipe collection</span>
+            <small>Load Recipe Pocket backup or Recipe Manager collection</small>
+            <input id="importFile" type="file" accept=".json,.zip,application/json,application/zip">
           </label>
           <button class="settings-action" id="importCodeButton">
-            <span>Import recipe code</span>
+            <span>Import single recipe</span>
             <small>Paste an RM1 code from Recipe Manager</small>
           </button>
           <label class="settings-action setting-field">

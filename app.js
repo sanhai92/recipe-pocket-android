@@ -1,11 +1,12 @@
 const STORAGE_KEY = "recipe-pocket-data-v1";
-const APP_VERSION = "1.0.11";
-const APP_VERSION_NOTES = "Adds shopping copy and default sort settings";
+const APP_VERSION = "1.0.13";
+const APP_VERSION_NOTES = "Imports Recipe Manager collection zip files";
 const RM1_BEGIN = "RM1-BEGIN:";
 const RM1_END = ":RM1-END";
 const RM1_LEGACY_PREFIX = "RM1:";
 const MAX_RM1_CODE_LENGTH = 100000;
 const MAX_RM1_DECODED_BYTES = 1000000;
+const MAX_COLLECTION_IMPORT_BYTES = 5_000_000;
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -487,13 +488,23 @@ function getCategorySortedShoppingSections() {
 function createShoppingItemData(item, scope) {
   const text = item.hasQuantity ? formatIngredient(item) : [item.unit, item.name].filter(Boolean).join(" ");
   return {
-    category: getIngredientCategory(item.name),
+    category: getIngredientCategory(item.name, item.category),
     key: `${scope}:${normalize(item.unit)}:${normalize(item.name)}`,
     text
   };
 }
 
-function getIngredientCategory(name) {
+function getIngredientCategory(name, importedCategory = "") {
+  const category = normalize(importedCategory);
+  if (category) {
+    if (/(meat|fish|seafood|poultry|chicken)/.test(category)) return "01-meat";
+    if (/(dairy|egg)/.test(category)) return "02-dairy";
+    if (/(vegetable|produce|veg)/.test(category)) return "03-vegetable";
+    if (/(fruit)/.test(category)) return "04-fruit";
+    if (/(grain|bread|pasta|rice|bakery)/.test(category)) return "05-grain";
+    if (/(legume|bean|pulse)/.test(category)) return "06-legume";
+    if (/(pantry|condiment|spice|oil|sauce)/.test(category)) return "07-pantry";
+  }
   const value = normalize(name);
   if (/(beef|chicken|pork|bacon|ham|turkey|sausage|fish|salmon|tuna|shrimp|meat)/.test(value)) return "01-meat";
   if (/(milk|cheese|yogurt|cream|butter|egg)/.test(value)) return "02-dairy";
@@ -661,7 +672,7 @@ function showScreen(screenId, title) {
   if (navItem) navItem.classList.add("active");
   $(screenId).classList.add("active");
   $("screenTitle").textContent = title;
-  $("addRecipeButton").classList.toggle("hidden", screenId === "mealPlannerScreen" || screenId === "settingsScreen");
+  $("addRecipeButton").classList.toggle("hidden", screenId !== "recipesScreen");
 }
 
 function wireEvents() {
@@ -1065,28 +1076,196 @@ function exportData() {
   renderBackupReminder();
 }
 
-function importData(event) {
+async function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const imported = JSON.parse(reader.result);
-      if (!Array.isArray(imported.recipes)) throw new Error("Invalid backup");
-      state = {
-        recipes: imported.recipes,
-        pantry: Array.isArray(imported.pantry) ? imported.pantry : [],
-        checkedShopping: [],
-        mealPlan: normalizeMealPlan(imported.mealPlan),
-        settings: normalizeSettings(imported.settings)
-      };
-      saveState();
-      renderAll();
-    } catch {
-      alert("That backup could not be imported.");
-    }
+  try {
+    const imported = await readImportFile(file);
+    const confirmed = confirm(
+      `Import ${imported.recipes.length} recipes from ${imported.label}?\n\n` +
+      `This replaces the recipes currently stored on this device.`
+    );
+    if (!confirmed) return;
+    state = {
+      recipes: imported.recipes,
+      pantry: imported.pantry,
+      checkedShopping: [],
+      mealPlan: normalizeMealPlan(imported.mealPlan),
+      settings: normalizeSettings({ ...state.settings, ...imported.settings })
+    };
+    saveState();
+    renderAll();
+    showToast(`Imported ${imported.recipes.length} recipes`);
+  } catch (error) {
+    alert(error.message || "That file could not be imported.");
+  } finally {
+    event.target.value = "";
+  }
+}
+
+async function readImportFile(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (isZipFile(bytes)) return readRecipeManagerCollection(bytes);
+  const imported = JSON.parse(new TextDecoder().decode(bytes));
+  if (!Array.isArray(imported.recipes)) throw new Error("This is not a Recipe Pocket backup.");
+  return {
+    label: "Recipe Pocket backup",
+    recipes: imported.recipes.map(normalizePocketRecipe),
+    pantry: Array.isArray(imported.pantry) ? imported.pantry : [],
+    mealPlan: imported.mealPlan,
+    settings: imported.settings
   };
-  reader.readAsText(file);
+}
+
+function isZipFile(bytes) {
+  return bytes[0] === 0x50 && bytes[1] === 0x4b;
+}
+
+async function readRecipeManagerCollection(bytes) {
+  const entries = await readZipEntries(bytes);
+  const metadata = JSON.parse(entries["metadata.json"] || "{}");
+  if (metadata.Format !== "PocketRecipeCollection") {
+    throw new Error("This zip is not a Recipe Manager collection export.");
+  }
+  const exportedRecipes = JSON.parse(entries["recipes.json"] || "[]");
+  const exportedIngredients = JSON.parse(entries["ingredients.json"] || "[]");
+  if (!Array.isArray(exportedRecipes)) throw new Error("This collection has no recipes.json file.");
+  const ingredientCategories = new Map(exportedIngredients.map((item) => [
+    normalize(readValue(item, "Name", "name")),
+    readValue(item, "Category", "category") || ""
+  ]));
+  return {
+    label: `Recipe Manager collection (${metadata.SourceAppVersion || "unknown version"})`,
+    recipes: exportedRecipes.map((recipe) => normalizeCollectionRecipe(recipe, ingredientCategories)),
+    pantry: [],
+    mealPlan: createEmptyMealPlan(),
+    settings: {}
+  };
+}
+
+function normalizePocketRecipe(recipe) {
+  return {
+    id: recipe.id || crypto.randomUUID(),
+    title: String(recipe.title || "Untitled recipe").trim(),
+    cuisine: String(recipe.cuisine || "").trim(),
+    minutes: Math.max(0, Number(recipe.minutes) || 0),
+    servings: clampServings(recipe.servings || 1),
+    favorite: Boolean(recipe.favorite),
+    tags: Array.isArray(recipe.tags) ? recipe.tags.map(String).filter(Boolean) : [],
+    ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients.map(normalizePocketIngredient).filter((item) => item.name) : [],
+    tools: Array.isArray(recipe.tools) ? recipe.tools.map(String).filter(Boolean) : [],
+    instructions: String(recipe.instructions || "").trim(),
+    source: String(recipe.source || "").trim(),
+    image: ""
+  };
+}
+
+function normalizeCollectionRecipe(recipe, ingredientCategories) {
+  const ingredients = readValue(recipe, "Ingredients", "ingredients") || [];
+  return {
+    id: crypto.randomUUID(),
+    title: String(readValue(recipe, "Title", "title") || "Untitled recipe").trim(),
+    cuisine: String(readValue(recipe, "Cuisine", "cuisine") || "").trim(),
+    minutes: Math.max(0, Number(readValue(recipe, "CookingTimeMinutes", "minutes")) || 0),
+    servings: clampServings(readValue(recipe, "Servings", "servings") || 1),
+    favorite: Boolean(readValue(recipe, "IsFavorite", "favorite")),
+    tags: normalizeStringList(readValue(recipe, "Tags", "tags")),
+    ingredients: Array.isArray(ingredients)
+      ? ingredients.map((item) => normalizeCollectionIngredient(item, ingredientCategories)).filter((item) => item.name)
+      : [],
+    tools: normalizeStringList(readValue(recipe, "Tools", "tools")),
+    instructions: String(readValue(recipe, "Instructions", "instructions") || "").trim(),
+    source: String(readValue(recipe, "SourceUrl", "source") || "").trim(),
+    image: ""
+  };
+}
+
+function normalizePocketIngredient(item) {
+  return {
+    quantity: item.quantity ?? null,
+    unit: String(item.unit || "").trim(),
+    name: String(item.name || "").trim(),
+    category: String(item.category || "").trim()
+  };
+}
+
+function normalizeCollectionIngredient(item, ingredientCategories) {
+  const name = String(readValue(item, "Name", "name") || "").trim();
+  return {
+    quantity: readValue(item, "Quantity", "quantity") ?? null,
+    unit: String(readValue(item, "Unit", "unit") || "").trim(),
+    name,
+    category: ingredientCategories.get(normalize(name)) || ""
+  };
+}
+
+function normalizeStringList(value) {
+  return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+}
+
+function readValue(object, ...keys) {
+  const key = keys.find((candidate) => object && Object.prototype.hasOwnProperty.call(object, candidate));
+  return key ? object[key] : undefined;
+}
+
+async function readZipEntries(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const eocdOffset = findEndOfCentralDirectory(view);
+  const entryCount = view.getUint16(eocdOffset + 10, true);
+  const centralDirectoryOffset = view.getUint32(eocdOffset + 16, true);
+  const entries = {};
+  let offset = centralDirectoryOffset;
+  for (let index = 0; index < entryCount; index++) {
+    if (view.getUint32(offset, true) !== 0x02014b50) throw new Error("This collection zip is damaged.");
+    const compressionMethod = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const uncompressedSize = view.getUint32(offset + 24, true);
+    const nameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localHeaderOffset = view.getUint32(offset + 42, true);
+    const name = new TextDecoder().decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+    if (["metadata.json", "ingredients.json", "recipes.json"].includes(name)) {
+      if (uncompressedSize > MAX_COLLECTION_IMPORT_BYTES) throw new Error("This collection is too large to import safely.");
+      entries[name] = await readZipEntry(bytes, localHeaderOffset, compressionMethod, compressedSize);
+    }
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+function findEndOfCentralDirectory(view) {
+  const start = Math.max(0, view.byteLength - 66000);
+  for (let offset = view.byteLength - 22; offset >= start; offset--) {
+    if (view.getUint32(offset, true) === 0x06054b50) return offset;
+  }
+  throw new Error("This collection zip is missing its directory.");
+}
+
+async function readZipEntry(bytes, localHeaderOffset, compressionMethod, compressedSize) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(localHeaderOffset, true) !== 0x04034b50) throw new Error("This collection zip is damaged.");
+  const nameLength = view.getUint16(localHeaderOffset + 26, true);
+  const extraLength = view.getUint16(localHeaderOffset + 28, true);
+  const dataOffset = localHeaderOffset + 30 + nameLength + extraLength;
+  const compressed = bytes.slice(dataOffset, dataOffset + compressedSize);
+  if (compressionMethod === 0) return new TextDecoder().decode(compressed);
+  if (compressionMethod !== 8) throw new Error("This collection uses an unsupported zip compression method.");
+  const decompressed = await inflateRaw(compressed);
+  return new TextDecoder().decode(decompressed);
+}
+
+async function inflateRaw(bytes) {
+  if (!("DecompressionStream" in window)) {
+    throw new Error("This browser cannot import Recipe Manager collection zips.");
+  }
+  try {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
 }
 
 function resetSamples() {
