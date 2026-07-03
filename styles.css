@@ -96,6 +96,13 @@ h1 { font-size: 2rem; line-height: 1; margin-bottom: 0; }
 h2 { font-size: 1.2rem; }
 h3 { font-size: 1rem; margin: 20px 0 8px; }
 
+.screen-count {
+  color: var(--muted);
+  font-size: .9rem;
+  font-weight: 750;
+  margin: 0 0 10px;
+}
+
 .screen { display: none; }
 .screen.active { display: block; }
 

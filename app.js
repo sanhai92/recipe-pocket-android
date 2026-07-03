@@ -1,6 +1,6 @@
 const STORAGE_KEY = "recipe-pocket-data-v1";
-const APP_VERSION = "1.0.13";
-const APP_VERSION_NOTES = "Imports Recipe Manager collection zip files";
+const APP_VERSION = "1.0.14";
+const APP_VERSION_NOTES = "Shows recipe totals and clearer recipe sharing";
 const RM1_BEGIN = "RM1-BEGIN:";
 const RM1_END = ":RM1-END";
 const RM1_LEGACY_PREFIX = "RM1:";
@@ -258,11 +258,20 @@ function renderRecipes() {
   const list = $("recipeList");
   list.innerHTML = "";
   const recipes = filteredRecipes();
+  renderRecipeCount(recipes.length);
   if (!recipes.length) {
     list.innerHTML = `<p class="empty">No recipes found.</p>`;
     return;
   }
   recipes.forEach((recipe) => list.append(createRecipeCard(recipe)));
+}
+
+function renderRecipeCount(visibleCount) {
+  const total = state.recipes.length;
+  const label = total === 1 ? "recipe" : "recipes";
+  $("recipeCount").textContent = visibleCount === total
+    ? `${total} ${label}`
+    : `${visibleCount} of ${total} ${label}`;
 }
 
 function createRecipeCard(recipe) {
@@ -788,7 +797,7 @@ async function shareCurrentRecipe() {
       return;
     }
     await navigator.clipboard.writeText(code);
-    alert("Recipe code copied.");
+    showToast("Copied code for this recipe only");
   } catch (error) {
     if (error?.name === "AbortError") return;
     alert(error.message || "The recipe code could not be created.");
